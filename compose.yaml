@@ -1,0 +1,96 @@
+services:
+  server:
+    build: .
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "51820:51820/udp"
+    command: ["python", "service.py"]
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./service.py
+          target: /app/service.py
+        - action: sync+restart
+          path: ./entrypoint.sh
+          target: /entrypoint.sh
+    environment:
+      PYTHONUNBUFFERED: "1"
+      WG_INTERFACE: "hetznat64"
+      WG_LOG_LEVEL: "trace"
+      WG_IPV6: "fd00:6464::1/64"
+      WG_PORT: "51820"
+      HCLOUD_API_TOKEN: "dummy_token"
+      HCLOUD_API_ENDPOINT: "http://hetzner:5000/v1"
+      DISCOVERY_LABEL_PREFIX: "hetznat64"
+    networks:
+      - hetznat64_net
+    depends_on:
+      hetzner:
+        condition: service_healthy
+  agent:
+    scale: 2
+    build: .
+    command: python agent.py
+    cap_add:
+      - NET_ADMIN
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./agent.py
+          target: /app/agent.py
+        - action: sync+restart
+          path: ./entrypoint.sh
+          target: /entrypoint.sh
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      PYTHONUNBUFFERED: "1"
+      WG_INTERFACE: "hetznat64"
+      WG_PORT: "51820"
+      WG_LOG_LEVEL: "trace"
+      CONTROL_SERVER_HOSTNAME: "server"
+      CONTROL_SERVER_PORT: "51820"
+      PORT: "5001"
+    labels:
+      - "hetznat64.status=waiting"
+    networks:
+      - hetznat64_net
+
+  hetzner:
+    build: .
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["python", "hetzner.py"]
+    environment:
+      DISCOVERY_LABEL_PREFIX: "hetznat64"
+    user: root
+    networks:
+      - hetznat64_net
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./hetzner.py
+          target: /app/hetzner.py
+    healthcheck:
+      test: ["CMD", "wget", "-O-", "http://127.0.0.1:5000/v1/servers"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+networks:
+  hetznat64_net:
+    enable_ipv6: true
+    # ipam:
+    #   config:
+    #     - subnet: fd00:6464::/64
+    #       gateway: fd00:6464::1
+# sudo mkdir -p /dev/net
+# sudo mknod /dev/net/tun c 10 200
+# sudo chown wireguard /dev/net/tun
+# sudo ip tuntap add dev tun0 mode tun user wireguard
+# sudo ip addr add 10.0.0.1/24 dev tun0
+# sudo ip link set dev tun0 up
+# / # exec 3<>/dev/net/tun
