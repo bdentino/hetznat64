@@ -74,6 +74,7 @@ read _ _ _ _ iface < <(sudo ip route show default);
 # This sets the IPv4 VPN network on the server side. Can be changed by env var.
 ip4out=$(sudo ip addr add $WG_IPV4 dev ${WG_INTERFACE})
 # printf "Setting ipv4 network address options... $ip4out\n";
+sudo sysctl -w net.ipv6.conf.hetznat64.disable_ipv6=0
 ip6out=$(sudo ip addr add $WG_IPV6 dev ${WG_INTERFACE})
 # printf "Setting ipv6 network address options... $ip6out\n";
 

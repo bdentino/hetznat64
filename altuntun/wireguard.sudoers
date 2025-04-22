@@ -3,6 +3,7 @@ wireguard ALL=(ALL) NOPASSWD: /bin/touch
 wireguard ALL=(ALL) NOPASSWD: /bin/mknod
 wireguard ALL=(ALL) NOPASSWD: /bin/chown
 wireguard ALL=(ALL) NOPASSWD: /usr/bin/wg
+wireguard ALL=(ALL) NOPASSWD: /sbin/sysctl
 wireguard ALL=(ALL) NOPASSWD: /sbin/ip
 wireguard ALL=(ALL) NOPASSWD: /usr/sbin/iptables-legacy
 wireguard ALL=(ALL) NOPASSWD: /usr/local/bin/altuntun
