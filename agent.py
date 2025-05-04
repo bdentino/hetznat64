@@ -88,6 +88,7 @@ if __name__ == "__main__":
     port = os.environ.get("WG_PORT", "51820")
     try:
         device = WireguardDevice.get(interface)
+        wgconf = device.get_config()
     except Exception as e:
         print(f"Wireguard interface {interface} not found, creating it")
         subprocess.Popen([
@@ -102,11 +103,11 @@ if __name__ == "__main__":
             time.sleep(1)
             try:
                 device = WireguardDevice.get(interface)
+                wgconf = device.get_config()
                 break
             except Exception as e:
                 print(f"Wireguard interface {interface} not found, retrying...")
 
-    wgconf = device.get_config()
     port = wgconf.listen_port
     agent_config = Hetznat64AgentConfig(
         wg_interface=interface,

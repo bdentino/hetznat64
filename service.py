@@ -105,6 +105,9 @@ class Hetznat64Service:
       has_peer = any(peer_ip in p.allowed_ips for p in config.peers.values())
       if not has_peer:
         endpoint_host = IPv6Interface(server.public_net.ipv6.ip).ip
+        # Services on hetzner servers with a ::/64 address will actually be listening on ::1
+        if endpoint_host.exploded.endswith(":0000"):
+            endpoint_host = IPv6Interface(endpoint_host.exploded[:-2] + "1").ip
         print(f"Server {server.id} with IP {endpoint_host} is waiting for handshake (peer ip: {peer_ip})")
         try:
             response = requests.post(
@@ -151,6 +154,7 @@ if __name__ == "__main__":
   port = os.environ.get("WG_PORT", "51820")
   try:
     device = WireguardDevice.get(interface)
+    wgconf = device.get_config()
   except Exception as e:
     print(f"Wireguard interface {interface} not found, creating it")
     subprocess.Popen([
@@ -165,6 +169,7 @@ if __name__ == "__main__":
       time.sleep(1)
       try:
         device = WireguardDevice.get(interface)
+        wgconf = device.get_config()
         break
       except Exception as e:
         print(f"Wireguard interface {interface} not found, retrying...")
@@ -172,7 +177,6 @@ if __name__ == "__main__":
   # set the wireguard interface to the ipv6 address
   subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(ipv6))], check=True)
 
-  wgconf = device.get_config()
   port = wgconf.listen_port
   wgkey = WireguardKey.generate()
   service = Hetznat64Service(

@@ -3,6 +3,9 @@ services:
     build: .
     cap_add:
       - NET_ADMIN
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv6.conf.default.disable_ipv6: 0
     ports:
       - "51820:51820/udp"
     command: service.py
@@ -39,6 +42,9 @@ services:
     command: agent.py
     cap_add:
       - NET_ADMIN
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv6.conf.default.disable_ipv6: 0
     develop:
       watch:
         - action: sync+restart
@@ -92,10 +98,10 @@ services:
 networks:
   hetznat64_net:
     enable_ipv6: true
-    # ipam:
-    #   config:
-    #     - subnet: fd00:6464::/64
-    #       gateway: fd00:6464::1
+    ipam:
+      config:
+        - subnet: fd00:6464::/64
+          gateway: fd00:6464::1
 # sudo mkdir -p /dev/net
 # sudo mknod /dev/net/tun c 10 200
 # sudo chown wireguard /dev/net/tun
