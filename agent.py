@@ -12,6 +12,8 @@ class Hetznat64AgentConfig:
     control_server_hostname: str
     control_server_port: int
     rest_port: int = 5001
+    cert_file: str = None
+    key_file: str = None
 
 class Hetznat64Agent:
     def __init__(self, config: Hetznat64AgentConfig):
@@ -21,7 +23,7 @@ class Hetznat64Agent:
         self.__setup_routes()
 
     def start(self):
-        self.__app.run(port=self.__config.rest_port, host='::')
+        self.__app.run(port=self.__config.rest_port, host='::', ssl_context=(self.__config.cert_file, self.__config.key_file) if self.__config.cert_file and self.__config.key_file else None)
 
     def stop(self):
         self.__app.stop()
@@ -80,12 +82,40 @@ class Hetznat64Agent:
             return jsonify(response), 200
 
 if __name__ == "__main__":
+    import subprocess, time
+    interface = os.environ.get("WG_INTERFACE", "hetznat64")
+    ipv6 = os.environ.get("WG_IPV6", "fd00:6464::1/64")
+    port = os.environ.get("WG_PORT", "51820")
+    try:
+        device = WireguardDevice.get(interface)
+    except Exception as e:
+        print(f"Wireguard interface {interface} not found, creating it")
+        subprocess.Popen([
+            "/usr/bin/sudo",
+            "/setup-wg.sh",
+            "--name", interface,
+            "--port", port,
+            "--ip6", ipv6,
+            "--ip4", os.environ.get("WG_IPV4", "10.0.0.1/24"),
+        ])
+        while True:
+            time.sleep(1)
+            try:
+                device = WireguardDevice.get(interface)
+                break
+            except Exception as e:
+                print(f"Wireguard interface {interface} not found, retrying...")
+
+    wgconf = device.get_config()
+    port = wgconf.listen_port
     agent_config = Hetznat64AgentConfig(
-        wg_interface=os.environ.get('WG_INTERFACE', 'hetznat64'),
-        wg_port=int(os.environ.get('WG_PORT', 51820)),
+        wg_interface=interface,
+        wg_port=port,
         control_server_hostname=os.environ.get('CONTROL_SERVER_HOSTNAME', 'server'),
         control_server_port=int(os.environ.get('CONTROL_SERVER_PORT', 51820)),
         rest_port=int(os.environ.get('PORT', 5001)),
+        cert_file=os.environ.get('CERT_FILE', None),
+        key_file=os.environ.get('KEY_FILE', None),
     )
 
     agent = Hetznat64Agent(agent_config)

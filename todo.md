@@ -12,14 +12,15 @@ Nat64:
 Reliability:
 
 - Handle scale in, scale out, restart of agents
-- Handle restart of server
+- Handle restart of server [DONE]
+- Handle change of server ip address
 - Tests & healthchecks based on connectivity
 
 Improvements:
 
 - Investigate panic with altuntun, see if we can switch back and check if performance is better
-- Move wg setup from entrypoint to a separate script and replace individual sudoers commands
-- Support for kernelspace wireguard
+- Move wg setup from entrypoint to a separate script and replace individual sudoers commands [DONE]
+- Support for kernelspace wireguard [DONE]
 - Preshared key support
 - Key rotation
 

@@ -6,6 +6,7 @@ from hcloud.servers import BoundServer
 import requests
 from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
 from ipaddress import ip_interface, IPv4Interface, IPv6Interface
+import subprocess
 
 @dataclass
 class WireguardServerConfig:
@@ -20,7 +21,6 @@ class WireguardServerConfig:
 
   # key for the wireguard server
   key: WireguardKey
-
 
 @dataclass(kw_only=True)
 class Hetznat64Config:
@@ -37,6 +37,12 @@ class Hetznat64Config:
 
   # Interval in seconds at which the service should poll the Hetzner Cloud API
   poll_interval: int = 5
+
+  # Path to the agent's certificate
+  agent_cert_file: str = None
+
+  # Path to the agent's key
+  agent_key_file: str = None
 
 
 class Hetznat64Service:
@@ -99,17 +105,18 @@ class Hetznat64Service:
       has_peer = any(peer_ip in p.allowed_ips for p in config.peers.values())
       if not has_peer:
         endpoint_host = IPv6Interface(server.public_net.ipv6.ip).ip
-        print(f"Server {server.id} with IP {server.public_net.ipv6.ip} is waiting for handshake (peer ip: {peer_ip})")
+        print(f"Server {server.id} with IP {endpoint_host} is waiting for handshake (peer ip: {peer_ip})")
         try:
             response = requests.post(
-                # TODO: this needs to be https
-                f"http://[{endpoint_host}]:5001/handshake",
+                f"https://[{endpoint_host}]:5001/handshake",
                 json={
                     'control_ip': str(self.__config.wireguard.ip),
                     'public_key': str(self.__config.wireguard.key.public_key()),
                     'agent_ip': str(peer_ip),
                 },
-                timeout=5
+                timeout=5,
+                verify=False,
+                cert=(self.__config.agent_cert_file, self.__config.agent_key_file) if self.__config.agent_cert_file and self.__config.agent_key_file else None
             )
             if response.status_code == 200:
                 data = response.json()
@@ -125,6 +132,7 @@ class Hetznat64Service:
           public_key=public_key,
           endpoint_host=endpoint_host,
           endpoint_port=endpoint_port,
+          persistent_keepalive=25,
           allowed_ips=[ipv6],
         ));
 
@@ -137,16 +145,44 @@ class Hetznat64Service:
 
 
 if __name__ == "__main__":
-  name = "hetznat64"
+  import subprocess
+  interface = os.environ.get("WG_INTERFACE", "hetznat64")
+  ipv6 = os.environ.get("WG_IPV6", "fd00:6464::1/64")
+  port = os.environ.get("WG_PORT", "51820")
+  try:
+    device = WireguardDevice.get(interface)
+  except Exception as e:
+    print(f"Wireguard interface {interface} not found, creating it")
+    subprocess.Popen([
+      "/usr/bin/sudo",
+      "/setup-wg.sh",
+      "--name", interface,
+      "--port", port,
+      "--ip6", ipv6,
+      "--ip4", os.environ.get("WG_IPV4", "10.0.0.1/24"),
+    ])
+    while True:
+      time.sleep(1)
+      try:
+        device = WireguardDevice.get(interface)
+        break
+      except Exception as e:
+        print(f"Wireguard interface {interface} not found, retrying...")
+
+  # set the wireguard interface to the ipv6 address
+  subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(ipv6))], check=True)
+
+  wgconf = device.get_config()
+  port = wgconf.listen_port
   wgkey = WireguardKey.generate()
-  ip = ip_interface(os.environ["WG_IPV6"]) if os.environ["WG_IPV6"] else ip_interface("fd00:6464::1/64")
-  port = int(os.environ["WG_PORT"]) if os.environ["WG_PORT"] else 51820
   service = Hetznat64Service(
     Hetznat64Config(
-      wireguard=WireguardServerConfig(name=name, ip=ip, port=port, key=wgkey),
+      wireguard=WireguardServerConfig(name=interface, ip=ip_interface(ipv6), port=port, key=wgkey),
       api_key=os.environ["HCLOUD_API_TOKEN"],
       api_endpoint=os.environ["HCLOUD_API_ENDPOINT"],
       discovery_label_prefix=os.environ["DISCOVERY_LABEL_PREFIX"],
+      agent_cert_file=os.environ["AGENT_CERT_FILE"],
+      agent_key_file=os.environ["AGENT_KEY_FILE"],
     )
   )
   print(f'Starting service on port {port} with key {wgkey.public_key()}')

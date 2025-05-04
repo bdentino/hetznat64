@@ -5,7 +5,7 @@ services:
       - NET_ADMIN
     ports:
       - "51820:51820/udp"
-    command: ["python", "service.py"]
+    command: service.py
     develop:
       watch:
         - action: sync+restart
@@ -23,15 +23,20 @@ services:
       HCLOUD_API_TOKEN: "dummy_token"
       HCLOUD_API_ENDPOINT: "http://hetzner:5000/v1"
       DISCOVERY_LABEL_PREFIX: "hetznat64"
+      AGENT_CERT_FILE: "/app/cert.pem"
+      AGENT_KEY_FILE: "/app/key.pem"
     networks:
       - hetznat64_net
     depends_on:
       hetzner:
         condition: service_healthy
+    volumes:
+      - ./ssl/cert.pem:/app/cert.pem
+      - ./ssl/key.pem:/app/key.pem
   agent:
     scale: 2
     build: .
-    command: python agent.py
+    command: agent.py
     cap_add:
       - NET_ADMIN
     develop:
@@ -53,11 +58,15 @@ services:
       CONTROL_SERVER_HOSTNAME: "server"
       CONTROL_SERVER_PORT: "51820"
       PORT: "5001"
+      CERT_FILE: "/app/cert.pem"
+      KEY_FILE: "/app/key.pem"
     labels:
       - "hetznat64.status=waiting"
     networks:
       - hetznat64_net
-
+    volumes:
+      - ./ssl/cert.pem:/app/cert.pem
+      - ./ssl/key.pem:/app/key.pem
   hetzner:
     build: .
     volumes:

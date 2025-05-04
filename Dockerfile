@@ -1,19 +1,19 @@
-ARG ALTUNTUN_VERSION=v0.94.62
 ARG ALPINE_VERSION=3.21
 ARG PYTHON_VERSION=3.13
 
 FROM alpine:${ALPINE_VERSION} AS builder
+
+ARG RUST_VERSION=1.86.0
+ARG BORINGTUN_VERSION=v0.6.0
+
 WORKDIR /app
-COPY altuntun/get_tun_flags.c altuntun/set_tun_flags.c /app/
-RUN apk add --no-cache --virtual .build-deps git cargo rust build-base openssl-dev linux-headers \
-  && git clone https://github.com/cloudflare/boringtun.git /app/altuntun \
-  && cd /app/altuntun \
-  && git checkout ${ALTUNTUN_VERSION} \
-  && sed -i 's/lto = true/lto = false/' Cargo.toml \
-  && cargo build --release \
-  && cd /app \
-  && gcc -o get_tun_flags get_tun_flags.c \
-  && gcc -o set_tun_flags set_tun_flags.c \
+RUN apk add --no-cache --virtual .build-deps git curl gcc build-base openssl-dev linux-headers \
+  && curl –proto ‘=https’ –tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${RUST_VERSION} \
+  && git clone https://github.com/bdentino/boringtun.git /app/boringtun \
+  && cd /app/boringtun \
+  && git checkout ${BORINGTUN_VERSION} \
+  && /root/.cargo/bin/cargo build --release \
+  && /root/.cargo/bin/rustup self uninstall -y \
   && apk del --purge .build-deps
 
 FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION}
@@ -25,11 +25,9 @@ RUN apk add --no-cache git && pip install -r requirements.txt && apk del --purge
 
 COPY . /app
 
-# Copy the altuntun binary from the builder stage
-COPY --from=builder /app/altuntun/target/release/boringtun-cli /usr/local/bin/altuntun
-COPY --from=builder /app/get_tun_flags /usr/local/bin/get_tun_flags
-COPY --from=builder /app/set_tun_flags /usr/local/bin/set_tun_flags
-COPY altuntun/wireguard.sudoers /etc/sudoers.d/wireguard
+# Copy the boringtun binary from the builder stage
+COPY --from=builder /app/boringtun/target/release/boringtun-cli /usr/local/bin/boringtun
+COPY wireguard.sudoers /etc/sudoers.d/wireguard
 RUN apk add --no-cache sudo wireguard-tools iproute2 libgcc iptables-legacy iptables libcap-setcap libcap-getcap strace && \
   addgroup -S wireguard && \
   adduser -S -G wireguard wireguard && \
@@ -38,15 +36,16 @@ RUN apk add --no-cache sudo wireguard-tools iproute2 libgcc iptables-legacy ipta
   mkdir -p /dev/net && \
   mknod /dev/net/tun c 10 200 && \
   chown wireguard:wireguard /dev/net/tun && \
-  setcap cap_net_admin+epi /usr/local/bin/altuntun
+  setcap cap_net_admin+epi /usr/local/bin/boringtun
 
 COPY update-ip.sh /update-ip.sh
-RUN chmod +x /update-ip.sh
+COPY setup-wg.sh /setup-wg.sh
+RUN chmod +x /update-ip.sh && chmod o-w /update-ip.sh && \
+  chmod +x /setup-wg.sh && chmod o-w /setup-wg.sh
 
 USER wireguard
 ENV LOGNAME=wireguard
 ENV WG_SUDO=1
-COPY entrypoint.sh /entrypoint.sh
 
-ENTRYPOINT [ "/entrypoint.sh" ]
-CMD [ "python", "service.py" ]
+ENTRYPOINT [ "python" ]
+CMD [ "service.py" ]
