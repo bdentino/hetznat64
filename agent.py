@@ -108,7 +108,6 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Wireguard interface {interface} not found, retrying...")
 
-    port = wgconf.listen_port
     agent_config = Hetznat64AgentConfig(
         wg_interface=interface,
         wg_port=port,
