@@ -177,7 +177,6 @@ if __name__ == "__main__":
   # set the wireguard interface to the ipv6 address
   subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(ipv6))], check=True)
 
-  port = wgconf.listen_port
   wgkey = WireguardKey.generate()
   service = Hetznat64Service(
     Hetznat64Config(
