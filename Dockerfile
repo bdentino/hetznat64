@@ -40,8 +40,10 @@ RUN apk add --no-cache sudo wireguard-tools iproute2 libgcc iptables-legacy ipta
 
 COPY update-ip.sh /update-ip.sh
 COPY setup-wg.sh /setup-wg.sh
+COPY setup-nat64.sh /setup-nat64.sh
 RUN chmod +x /update-ip.sh && chmod o-w /update-ip.sh && \
-  chmod +x /setup-wg.sh && chmod o-w /setup-wg.sh
+  chmod +x /setup-wg.sh && chmod o-w /setup-wg.sh && \
+  chmod +x /setup-nat64.sh && chmod o-w /setup-nat64.sh
 
 USER wireguard
 ENV LOGNAME=wireguard

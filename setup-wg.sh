@@ -71,7 +71,20 @@ while true; do
 			sleep 1
 			;;
 		*)
-      chown wireguard:wireguard -R /var/run/wireguard
+			break
+			;;
+	esac
+done
+
+# Wait for wireguard socket to be created
+while true; do
+	output=$(chown wireguard:wireguard -R /var/run/wireguard 2>&1)
+	case "$output" in
+		*"No such file or directory"*)
+			printf "Startup error: no such file or directory: sleeping...\n"
+			sleep 1
+			;;
+		*)
 			break
 			;;
 	esac

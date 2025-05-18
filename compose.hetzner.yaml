@@ -1,0 +1,25 @@
+networks:
+  hetzner: {}
+
+services:
+  hetzner:
+    build: .
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["python", "hetzner.py"]
+    environment:
+      DISCOVERY_LABEL_PREFIX: "$DISCOVERY_LABEL_PREFIX"
+    user: root
+    networks:
+      - hetzner
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./hetzner.py
+          target: /app/hetzner.py
+    healthcheck:
+      test: ["CMD", "wget", "-O-", "http://127.0.0.1:5000/v1/servers"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s

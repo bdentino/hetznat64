@@ -1,0 +1,51 @@
+networks:
+  nat64:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:6464:64:ff9b::/64
+          gateway: fd00:6464:64:ff9b::1
+          aux_addresses:
+            tayga6: fd00:6464:64:ff9b::6464
+        - subnet: 10.64.0.0/24
+          gateway: 10.64.0.1
+
+configs:
+  tayga_conf:
+    content: |
+      tun-device nat64
+      data-dir /var/db/tayga
+      prefix 64:ff9b::/96
+      ipv6-addr fd00:6464:64:ff9b::6464
+      ipv4-addr 10.64.64.1
+      dynamic-pool 10.64.64.0/22
+
+services:
+  tayga:
+    build:
+      context: ./tayga
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: 1
+      net.ipv6.conf.all.forwarding: 1
+      net.ipv6.conf.default.forwarding: 1
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv6.conf.default.disable_ipv6: 0
+    networks:
+      nat64:
+        ipv6_address: ${NAT64_IP}
+        ipv4_address: 10.64.0.64
+    tty: true
+    configs:
+      - source: tayga_conf
+        target: /usr/local/etc/tayga/tayga.conf
+    environment:
+      WG_NAT64_IP: ${WG_NAT64_IP}
+      WG_NETWORK: ${WG_NETWORK}
+    healthcheck:
+      test: ["CMD", "ip", "link", "show", "nat64"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 10s

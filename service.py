@@ -177,6 +177,12 @@ if __name__ == "__main__":
   # set the wireguard interface to the ipv6 address
   subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(ipv6))], check=True)
 
+  # set the nat64 interface to the ipv6 address
+  nat64_prefix = os.environ.get("NAT64_PREFIX", "64:ff9b::/96")
+  nat64_ipv6 = os.environ.get("NAT64_IPV6", "fd00:6464:64:ff9b::64")
+  nat64_interface = os.environ.get("NAT64_INTERFACE", "eth0")
+  subprocess.run(["/usr/bin/sudo", "/setup-nat64.sh", "--prefix", nat64_prefix, "--via", nat64_ipv6], check=True)
+
   wgkey = WireguardKey.generate()
   service = Hetznat64Service(
     Hetznat64Config(

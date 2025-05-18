@@ -2,9 +2,9 @@ from dataclasses import dataclass
 import socket
 from flask import Flask, request, jsonify
 from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
-from ipaddress import ip_interface, IPv4Interface, IPv6Interface
+from ipaddress import ip_interface, IPv6Interface
 import os
-
+import subprocess
 @dataclass
 class Hetznat64AgentConfig:
     wg_interface: str
@@ -47,7 +47,6 @@ class Hetznat64Agent:
             new_agent_ip = f"{agent_ip_addr}/{control_prefix.split('/')[-1]}"
 
             # Update IP using sudo script
-            import subprocess
             subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(new_agent_ip))], check=True)
 
             # Check and update Wireguard configuration
@@ -69,7 +68,7 @@ class Hetznat64Agent:
                 preshared_key=preshared_key,
                 endpoint_host=endpoint_host,
                 endpoint_port=self.__config.control_server_port,
-                allowed_ips=[control_ip],
+                allowed_ips=[control_ip, IPv6Interface("64:ff9b::/96")],
             ))
 
             print(config.to_wgconfig(wgquick_format=True))
@@ -107,6 +106,10 @@ if __name__ == "__main__":
                 break
             except Exception as e:
                 print(f"Wireguard interface {interface} not found, retrying...")
+
+    # Setup NAT64 route
+    nat64_prefix = os.environ.get("NAT64_PREFIX", "64:ff9b::/96")
+    subprocess.run(["/usr/bin/sudo", "/setup-nat64.sh", "--prefix", nat64_prefix, "--dev", interface], check=True)
 
     agent_config = Hetznat64AgentConfig(
         wg_interface=interface,

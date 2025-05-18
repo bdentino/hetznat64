@@ -1,4 +1,5 @@
 wireguard ALL=(ALL) NOPASSWD: /update-ip.sh
+wireguard ALL=(ALL) NOPASSWD: /setup-nat64.sh
 wireguard ALL=(ALL) NOPASSWD: /setup-wg.sh
 Defaults!/usr/local/bin/boringtun env_keep += "LOGNAME WG_SUDO"
 Defaults!/setup-wg.sh env_keep += "LOGNAME WG_SUDO"
