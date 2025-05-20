@@ -14,8 +14,8 @@ RUN apk add --no-cache --virtual .build-deps build-base openssl-dev openssl expa
   rm /tmp/unbound.tar.gz && \
   cd /usr/src/unbound && \
   ./configure --enable-dnscrypt --with-libnghttp2 && \
-  make && \
-  make install && \
+  make && make install && \
+  cd .. && rm -rf unbound && \
   mkdir -p /usr/local/etc/unbound && \
   chown -R unbound:unbound /usr/local/etc/unbound && \
   sudo -u unbound unbound-control-setup && \

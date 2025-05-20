@@ -1,12 +1,13 @@
-from dataclasses import dataclass
 import os
 import time
-import hcloud
-from hcloud.servers import BoundServer
 import requests
-from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
-from ipaddress import ip_interface, IPv4Interface, IPv6Interface
 import subprocess
+import hcloud
+from ipaddress import ip_interface, IPv4Interface, IPv6Interface
+from dataclasses import dataclass
+
+from hcloud.servers import BoundServer
+from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
 
 @dataclass
 class WireguardServerConfig:
@@ -38,11 +39,14 @@ class Hetznat64Config:
   # Interval in seconds at which the service should poll the Hetzner Cloud API
   poll_interval: int = 5
 
-  # Path to the agent's certificate
-  agent_cert_file: str = None
+  # Path to the CA certificate
+  ca_file: str = None
 
-  # Path to the agent's key
-  agent_key_file: str = None
+  # Path to the server's certificate
+  cert_file: str = None
+
+  # Path to the server's key
+  key_file: str = None
 
 
 class Hetznat64Service:
@@ -118,8 +122,8 @@ class Hetznat64Service:
                     'agent_ip': str(peer_ip),
                 },
                 timeout=5,
-                verify=False,
-                cert=(self.__config.agent_cert_file, self.__config.agent_key_file) if self.__config.agent_cert_file and self.__config.agent_key_file else None
+                cert=(self.__config.cert_file, self.__config.key_file),
+                verify=self.__config.ca_file,
             )
             if response.status_code == 200:
                 data = response.json()
@@ -148,7 +152,6 @@ class Hetznat64Service:
 
 
 if __name__ == "__main__":
-  import subprocess
   interface = os.environ.get("WG_INTERFACE", "hetznat64")
   ipv6 = os.environ.get("WG_IPV6", "fd00:6464::1/64")
   port = os.environ.get("WG_PORT", "51820")
@@ -190,8 +193,9 @@ if __name__ == "__main__":
       api_key=os.environ["HCLOUD_API_TOKEN"],
       api_endpoint=os.environ["HCLOUD_API_ENDPOINT"],
       discovery_label_prefix=os.environ["DISCOVERY_LABEL_PREFIX"],
-      agent_cert_file=os.environ["AGENT_CERT_FILE"],
-      agent_key_file=os.environ["AGENT_KEY_FILE"],
+      cert_file=os.environ["CERT_FILE"],
+      key_file=os.environ["KEY_FILE"],
+      ca_file=os.environ["CA_FILE"],
     )
   )
   print(f'Starting service on port {port} with key {wgkey.public_key()}')

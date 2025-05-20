@@ -28,7 +28,7 @@ COPY . /app
 # Copy the boringtun binary from the builder stage
 COPY --from=builder /app/boringtun/target/release/boringtun-cli /usr/local/bin/boringtun
 COPY wireguard.sudoers /etc/sudoers.d/wireguard
-RUN apk add --no-cache sudo wireguard-tools iproute2 libgcc iptables-legacy iptables libcap-setcap libcap-getcap strace && \
+RUN apk add --no-cache sudo openssl curl wireguard-tools iproute2 libgcc iptables-legacy iptables libcap-setcap libcap-getcap strace && \
   addgroup -S wireguard && \
   adduser -S -G wireguard wireguard && \
   adduser wireguard wheel && \
@@ -41,9 +41,11 @@ RUN apk add --no-cache sudo wireguard-tools iproute2 libgcc iptables-legacy ipta
 COPY update-ip.sh /update-ip.sh
 COPY setup-wg.sh /setup-wg.sh
 COPY setup-nat64.sh /setup-nat64.sh
+COPY generate-cert.sh /generate-cert.sh
 RUN chmod +x /update-ip.sh && chmod o-w /update-ip.sh && \
   chmod +x /setup-wg.sh && chmod o-w /setup-wg.sh && \
-  chmod +x /setup-nat64.sh && chmod o-w /setup-nat64.sh
+  chmod +x /setup-nat64.sh && chmod o-w /setup-nat64.sh && \
+  chmod +x /generate-cert.sh && chmod o-w /generate-cert.sh
 
 USER wireguard
 ENV LOGNAME=wireguard

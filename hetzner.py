@@ -1,10 +1,13 @@
-from flask import Flask, jsonify, request
-import docker
 import os
 import hashlib
-from typing import List, Dict, Any, Set
 
-app = Flask(__name__)
+from typing import List, Dict, Any, Set
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+import docker
+import uvicorn
+
+app = FastAPI()
 client = docker.from_env()
 
 # Get the discovery label prefix from environment variable, default to "hetznat64"
@@ -186,10 +189,13 @@ def get_mock_servers(label_selector: str = None) -> List[Dict[str, Any]]:
 
     return servers
 
-@app.route('/v1/servers', methods=['GET'])
-def get_servers():
+class ServersResponse(BaseModel):
+    servers: List[Dict[str, Any]]
+    meta: Dict[str, Any]
+
+@app.get("/v1/servers", response_model=ServersResponse)
+async def get_servers(label_selector: str = Query(None)):
     """Mock endpoint for GET /v1/servers."""
-    label_selector = request.args.get('label_selector')
     servers = get_mock_servers(label_selector)
 
     response = {
@@ -206,7 +212,7 @@ def get_servers():
         }
     }
 
-    return jsonify(response)
+    return response
 
 if __name__ == '__main__':
-    app.run(host='::', port=5000)
+    uvicorn.run(app, host=["::", "0.0.0.0"], port=5000)
