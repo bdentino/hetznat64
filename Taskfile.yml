@@ -1,0 +1,32 @@
+version: "3"
+
+vars:
+  DOCKER_REGISTRY: bdentino
+  DOCKER_TAG:
+    sh: |
+      GIT_TAG=$(git rev-parse --short HEAD)
+      if ! git diff --quiet || ! git diff --cached --quiet; then
+        GIT_TAG="$GIT_TAG-dirty"
+      fi
+      echo $GIT_TAG
+
+tasks:
+  build:docker:hetznat64:
+    desc: Build multi-arch hetznat64 image
+    cmds:
+      - |
+        docker buildx build --push --platform linux/amd64,linux/arm64 \
+          --progress=plain \
+          -t {{.DOCKER_REGISTRY}}/hetznat64:{{.DOCKER_TAG}} .
+
+  build:docker:tayga:
+    desc: Build multi-arch tayga image
+    cmds:
+      - |
+        docker buildx build --push --platform linux/amd64,linux/arm64 \
+          --progress=plain \
+          -t {{.DOCKER_REGISTRY}}/tayga:{{.DOCKER_TAG}} tayga
+
+  build:docker:
+    desc: Build all images
+    deps: [build:docker:hetznat64, build:docker:tayga]

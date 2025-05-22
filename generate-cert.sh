@@ -20,6 +20,15 @@ while [ "$#" -gt 0 ]; do
             fi
             shift
             ;;
+        --host=*)
+            # Store hostnames in colon-separated string
+            if [ -z "$hostnames" ]; then
+                hostnames="${1#*=}"
+            else
+                hostnames="$hostnames:${1#*=}"
+            fi
+            shift
+            ;;
         --out=*)
             out_dir="${1#*=}"
             shift
@@ -51,6 +60,17 @@ openssl genrsa -out "$tmp_dir/cert.key" 4096
 
 # Build SAN extension string
 san="subjectAltName=DNS:localhost"
+
+# Add additional hostnames if specified
+if [ -n "$hostnames" ]; then
+    OLDIFS="$IFS"
+    IFS=:
+    for host in $hostnames; do
+        san="$san,DNS:$host"
+    done
+    IFS="$OLDIFS"
+fi
+
 first=false
 
 # Add IPs from specified interfaces
