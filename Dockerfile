@@ -23,8 +23,6 @@ WORKDIR /app
 ADD requirements.txt /app
 RUN apk add --no-cache git && pip install -r requirements.txt && apk del --purge git
 
-COPY . /app
-
 # Copy the boringtun binary from the builder stage
 COPY --from=builder /app/boringtun/target/release/boringtun-cli /usr/local/bin/boringtun
 COPY wireguard.sudoers /etc/sudoers.d/wireguard
