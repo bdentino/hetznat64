@@ -15,7 +15,6 @@ class Hetznat64AgentConfig:
     wg_interface: str
     wg_port: int
     control_server_hostname: str
-    control_server_port: int
     rest_port: int = 5001
     cert_file: str = None
     key_file: str = None
@@ -48,6 +47,7 @@ class Hetznat64Agent:
         data = await request.json()
         agent_ip = data.get('agent_ip')
         control_ip = data.get('control_ip')
+        control_port = data.get('control_port')
         public_key = data.get('public_key')
         preshared_key = data.get('preshared_key', None)
         print("data", data)
@@ -81,7 +81,7 @@ class Hetznat64Agent:
             public_key=public_key,
             preshared_key=preshared_key,
             endpoint_host=endpoint_host,
-            endpoint_port=self.__config.control_server_port,
+            endpoint_port=control_port,
             allowed_ips=[control_ip, IPv6Interface("64:ff9b::/96")],
         ))
 
@@ -96,20 +96,16 @@ class Hetznat64Agent:
 
 if __name__ == "__main__":
     interface = os.environ.get("WG_INTERFACE", "hetznat64")
-    ipv6 = os.environ.get("WG_IPV6", "fd00:6464::1/64")
     port = os.environ.get("WG_PORT", "51820")
+    ipv6 = os.environ.get("WG_IPV6", "fd00:6464::1/64")
+    ipv4 = os.environ.get("WG_IPV4", "10.0.0.1/24")
     try:
         device = WireguardDevice.get(interface)
         wgconf = device.get_config()
     except Exception as e:
         print(f"Wireguard interface {interface} not found, creating it")
-        subprocess.Popen([
-            "/usr/bin/sudo",
-            "/setup-wg.sh",
-            "--name", interface,
-            "--port", port,
-            "--ip6", ipv6,
-            "--ip4", os.environ.get("WG_IPV4", "10.0.0.1/24"),
+        subprocess.Popen([ "/usr/bin/sudo", "/setup-wg.sh",
+            "--name", interface, "--port", port, "--ip6", ipv6, "--ip4", ipv4,
         ])
         while True:
             time.sleep(1)
@@ -128,7 +124,6 @@ if __name__ == "__main__":
         wg_interface=interface,
         wg_port=port,
         control_server_hostname=os.environ.get('CONTROL_SERVER_HOSTNAME', 'server'),
-        control_server_port=int(os.environ.get('CONTROL_SERVER_PORT', 51820)),
         rest_port=int(os.environ.get('PORT', 5001)),
         cert_file=os.environ.get('CERT_FILE', None),
         key_file=os.environ.get('KEY_FILE', None),

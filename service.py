@@ -118,6 +118,7 @@ class Hetznat64Service:
                 f"https://[{endpoint_host}]:5001/handshake",
                 json={
                     'control_ip': str(self.__config.wireguard.ip),
+                    'control_port': self.__config.wireguard.port,
                     'public_key': str(self.__config.wireguard.key.public_key()),
                     'agent_ip': str(peer_ip),
                 },
@@ -190,9 +191,9 @@ if __name__ == "__main__":
   service = Hetznat64Service(
     Hetznat64Config(
       wireguard=WireguardServerConfig(name=interface, ip=ip_interface(ipv6), port=port, key=wgkey),
+      discovery_label_prefix=os.environ.get("DISCOVERY_LABEL_PREFIX", 'hetznat64'),
+      api_endpoint=os.environ.get("HCLOUD_API_ENDPOINT", 'https://api.hetzner.cloud/v1'),
       api_key=os.environ["HCLOUD_API_TOKEN"],
-      api_endpoint=os.environ["HCLOUD_API_ENDPOINT"],
-      discovery_label_prefix=os.environ["DISCOVERY_LABEL_PREFIX"],
       cert_file=os.environ["CERT_FILE"],
       key_file=os.environ["KEY_FILE"],
       ca_file=os.environ["CA_FILE"],
