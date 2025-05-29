@@ -6,27 +6,56 @@ import time
 from ipaddress import ip_interface, IPv6Interface
 from dataclasses import dataclass
 
+import hcloud
+import requests
 import uvicorn
 from fastapi import FastAPI, Request
 from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
 
 @dataclass
 class Hetznat64AgentConfig:
+    # Wireguard config
     wg_interface: str
     wg_port: int
+
+    # Control server details
     control_server_hostname: str
+
+    # Agent server config
     rest_port: int = 5001
     cert_file: str = None
     key_file: str = None
     ca_file: str = None
+
+    # Hetzner Cloud API
+    api_endpoint: str = "https://api.hetzner.cloud/v1"
+    api_key: str
+    discovery_label_prefix: str = "hetznat64"
 
 
 class Hetznat64Agent:
     def __init__(self, config: Hetznat64AgentConfig):
         self.__config = config
         self.__wg_key = None
+        self.__server_id = None
+        self.__client = hcloud.Client(token=self.__config.api_key, api_endpoint=self.__config.api_endpoint)
         self.__app = FastAPI()
         self.__setup_routes()
+
+    def add_labels(self, labels: dict):
+        if not self.__server_id:
+            try:
+                response = requests.get('http://169.254.169.254/hetzner/v1/metadata/instance-id')
+                self.__server_id = response.text
+            except Exception:
+                # If hetzner metadata server is not available,
+                # assume we're running in dev environment
+                self.__server_id = os.environ.get('HOSTNAME', None)
+
+        server = self.__client.servers.get_by_id(self.__server_id)
+        existing_labels = server.labels or {}
+        existing_labels.update(labels)
+        server.update(labels=existing_labels)
 
     def start(self):
         uvicorn.run(self.__app, host='::', port=self.__config.rest_port,
@@ -35,6 +64,9 @@ class Hetznat64Agent:
                     ssl_ca_certs=self.__config.ca_file,
                     ssl_cert_reqs=ssl.CERT_REQUIRED
         )
+        self.add_labels({
+            f'{self.__config.discovery_label_prefix}.status': 'waiting'
+        })
 
     def __setup_routes(self):
         self.__app.get('/health')(self.__health)
@@ -88,6 +120,11 @@ class Hetznat64Agent:
         print(config.to_wgconfig(wgquick_format=True))
         WireguardDevice.get(self.__config.wg_interface).set_config(config)
 
+        # TODO: this label shouldn't be updated until connection is confirmed
+        self.add_labels({
+            f'{self.__config.discovery_label_prefix}.status': 'ready'
+        })
+
         response = {
             'public_key': str(self.__wg_key.public_key()),
             'port': self.__config.wg_port,
@@ -128,6 +165,9 @@ if __name__ == "__main__":
         cert_file=os.environ.get('CERT_FILE', None),
         key_file=os.environ.get('KEY_FILE', None),
         ca_file=os.environ.get('CA_FILE', None),
+        api_endpoint=os.environ.get('HCLOUD_API_ENDPOINT', 'https://api.hetzner.cloud/v1'),
+        api_key=os.environ.get('HCLOUD_API_TOKEN', None),
+        discovery_label_prefix=os.environ.get('DISCOVERY_LABEL_PREFIX', 'hetznat64'),
     )
 
     agent = Hetznat64Agent(agent_config)
