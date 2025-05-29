@@ -12,7 +12,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
 
-@dataclass
+@dataclass(kw_only=True)
 class Hetznat64AgentConfig:
     # Wireguard config
     wg_interface: str
@@ -28,8 +28,8 @@ class Hetznat64AgentConfig:
     ca_file: str = None
 
     # Hetzner Cloud API
-    api_endpoint: str = "https://api.hetzner.cloud/v1"
     api_key: str
+    api_endpoint: str = "https://api.hetzner.cloud/v1"
     discovery_label_prefix: str = "hetznat64"
 
 
