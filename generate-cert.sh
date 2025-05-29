@@ -21,11 +21,20 @@ while [ "$#" -gt 0 ]; do
             shift
             ;;
         --host=*)
-            # Store hostnames in colon-separated string
+            # Store hostnames in comma-separated string
             if [ -z "$hostnames" ]; then
                 hostnames="${1#*=}"
             else
-                hostnames="$hostnames:${1#*=}"
+                hostnames="$hostnames,${1#*=}"
+            fi
+            shift
+            ;;
+        --ip=*)
+            # Store ips in comma-separated string
+            if [ -z "$ips" ]; then
+                ips="${1#*=}"
+            else
+                ips="$ips,${1#*=}"
             fi
             shift
             ;;
@@ -64,9 +73,18 @@ san="subjectAltName=DNS:localhost"
 # Add additional hostnames if specified
 if [ -n "$hostnames" ]; then
     OLDIFS="$IFS"
-    IFS=:
+    IFS=,
     for host in $hostnames; do
         san="$san,DNS:$host"
+    done
+    IFS="$OLDIFS"
+fi
+
+if [ -n "$ips" ]; then
+    OLDIFS="$IFS"
+    IFS=,
+    for ip in $ips; do
+        san="$san,IP:$ip"
     done
     IFS="$OLDIFS"
 fi
