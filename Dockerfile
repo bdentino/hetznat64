@@ -36,6 +36,7 @@ RUN apk add --no-cache sudo openssl curl wireguard-tools iproute2 libgcc iptable
   chown wireguard:wireguard /dev/net/tun && \
   setcap cap_net_admin+epi /usr/local/bin/boringtun
 
+ADD service.py hetzner.py agent.py /app/
 COPY update-ip.sh /update-ip.sh
 COPY setup-wg.sh /setup-wg.sh
 COPY setup-nat64.sh /setup-nat64.sh
