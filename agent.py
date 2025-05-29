@@ -58,15 +58,13 @@ class Hetznat64Agent:
         server.update(labels=existing_labels)
 
     def start(self):
+        self.add_labels({ f'{self.__config.discovery_label_prefix}.status': 'waiting' })
         uvicorn.run(self.__app, host='::', port=self.__config.rest_port,
                     ssl_certfile=self.__config.cert_file,
                     ssl_keyfile=self.__config.key_file,
                     ssl_ca_certs=self.__config.ca_file,
                     ssl_cert_reqs=ssl.CERT_REQUIRED
         )
-        self.add_labels({
-            f'{self.__config.discovery_label_prefix}.status': 'waiting'
-        })
 
     def __setup_routes(self):
         self.__app.get('/health')(self.__health)
