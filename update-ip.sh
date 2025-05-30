@@ -17,3 +17,6 @@ ip -6 addr flush dev $WG_INTERFACE
 
 # Add the new IPv6 address
 ip -6 addr add $1 dev $WG_INTERFACE
+
+# Enable forwarding of nat64 from outside the container
+ip6tables -t nat -A POSTROUTING -o $WG_INTERFACE -j MASQUERADE
