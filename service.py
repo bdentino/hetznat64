@@ -58,7 +58,6 @@ class Hetznat64Service:
 
   def start(self):
     print("Starting Hetznat64 service with config:")
-    print(self.__config)
     if not self.__server:
       interface = self.__config.wireguard.name
       addresses = [self.__config.wireguard.ip]
@@ -122,7 +121,7 @@ class Hetznat64Service:
                     'public_key': str(self.__config.wireguard.key.public_key()),
                     'agent_ip': str(peer_ip),
                 },
-                timeout=5,
+                timeout=10,
                 cert=(self.__config.cert_file, self.__config.key_file),
                 verify=self.__config.ca_file,
             )

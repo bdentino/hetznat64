@@ -38,6 +38,7 @@ class Hetznat64Agent:
         self.__config = config
         self.__wg_key = None
         self.__server_id = None
+        self.__control_ip = None
         self.__client = hcloud.Client(token=self.__config.api_key, api_endpoint=self.__config.api_endpoint)
         self.__app = FastAPI()
         self.__setup_routes()
@@ -45,7 +46,7 @@ class Hetznat64Agent:
     def add_labels(self, labels: dict):
         if not self.__server_id:
             try:
-                response = requests.get('http://169.254.169.254/hetzner/v1/metadata/instance-id')
+                response = requests.get('http://169.254.169.254/hetzner/v1/metadata/instance-id', timeout=2)
                 self.__server_id = response.text
             except Exception:
                 # If hetzner metadata server is not available,
@@ -67,8 +68,12 @@ class Hetznat64Agent:
         )
 
     def __setup_routes(self):
+        self.__app.get('/ready')(self.__ready)
         self.__app.get('/health')(self.__health)
         self.__app.post('/handshake')(self.__handshake)
+
+    async def __ready(self):
+        return {"status": "ok"}
 
     async def __health(self):
         return {"status": "ok"}
@@ -80,10 +85,11 @@ class Hetznat64Agent:
         control_port = data.get('control_port')
         public_key = data.get('public_key')
         preshared_key = data.get('preshared_key', None)
-        print("data", data)
 
         if not self.__wg_key:
             self.__wg_key = WireguardKey.generate()
+
+        self.__control_ip = ip_interface(control_ip).ip
 
         # Extract prefix from control_ip and apply to agent_ip
         control_prefix = str(ip_interface(control_ip).network)
@@ -120,7 +126,7 @@ class Hetznat64Agent:
 
         # TODO: this label shouldn't be updated until connection is confirmed
         self.add_labels({
-            f'{self.__config.discovery_label_prefix}.status': 'ready'
+            f'{self.__config.discovery_label_prefix}.status': 'connected'
         })
 
         response = {

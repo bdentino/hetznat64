@@ -127,6 +127,9 @@ services:
       CA_FILE: "/certificates/ca.pem"
       CERT_FILE: "/home/wireguard/cert.pem"
       KEY_FILE: "/home/wireguard/cert.key"
+      HCLOUD_API_TOKEN: "dummy_token"
+      HCLOUD_API_ENDPOINT: "http://hetzner:5000/v1"
+      DISCOVERY_LABEL_PREFIX: "$DISCOVERY_LABEL_PREFIX"
     labels:
       - "$DISCOVERY_LABEL_PREFIX.status=waiting"
     networks:

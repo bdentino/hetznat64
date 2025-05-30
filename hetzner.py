@@ -2,13 +2,14 @@ import os
 import hashlib
 
 from typing import List, Dict, Any, Set
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
 import docker
 import uvicorn
 
 app = FastAPI()
 client = docker.from_env()
+label_store = {}
 
 # Get the discovery label prefix from environment variable, default to "hetznat64"
 DISCOVERY_LABEL_PREFIX = os.getenv("DISCOVERY_LABEL_PREFIX", "hetznat64")
@@ -88,104 +89,102 @@ def get_mock_servers(label_selector: str = None) -> List[Dict[str, Any]]:
             continue
 
         # Check if container has the required label
-        labels = container.labels or {}
-        if f"{DISCOVERY_LABEL_PREFIX}.status" in labels and labels[f"{DISCOVERY_LABEL_PREFIX}.status"] == "waiting":
-            # If label_selector is provided, check if container matches it
-            if label_selector:
-                # Parse the label selector (simple implementation for now)
-                # Format expected: "key=value" or "key"
-                parts = label_selector.split("=")
-                key = parts[0]
-                if len(parts) > 1:
-                    value = parts[1]
-                    if key not in labels or labels[key] != value:
-                        continue
-                else:
-                    if key not in labels:
-                        continue
+        labels = label_store.get(container.id, {})
+        if label_selector:
+            # Parse the label selector (simple implementation for now)
+            # Format expected: "key=value" or "key"
+            parts = label_selector.split("=")
+            key = parts[0]
+            if len(parts) > 1:
+                value = parts[1]
+                if key not in labels or labels[key] != value:
+                    continue
+            else:
+                if key not in labels:
+                    continue
 
-            # Get container's IPv6 address
-            ipv6 = get_container_ipv6(container)
-            ipv4 = get_container_ipv4(container)
+        # Get container's IPv6 address
+        ipv6 = get_container_ipv6(container)
+        ipv4 = get_container_ipv4(container)
 
-            # Create mock server object
-            server = {
-                "id": container_name_to_int(container.name),
-                "name": container.id,
-                "status": "running",
-                "public_net": {
-                    "ipv4": {
-                        "id": 1,
-                        "ip": ipv4,
-                        "blocked": False,
-                        "dns_ptr": []
-                    },
-                    "ipv6": {
-                        "id": 2,
-                        "ip": f"{ipv6}/64",
-                        "blocked": False,
-                        "dns_ptr": []
-                    },
-                    "floating_ips": []
-                },
-                # Add other required fields with mock values
-                "server_type": {
+        # Create mock server object
+        server = {
+            "id": container_name_to_int(container.name),
+            "name": container.id,
+            "status": "running",
+            "public_net": {
+                "ipv4": {
                     "id": 1,
-                    "name": "cx11",
-                    "description": "CX11",
-                    "cores": 1,
-                    "memory": 2.0,
-                    "disk": 20,
-                    "prices": []
+                    "ip": ipv4,
+                    "blocked": False,
+                    "dns_ptr": []
                 },
-                "datacenter": {
+                "ipv6": {
+                    "id": 2,
+                    "ip": f"{ipv6}/64",
+                    "blocked": False,
+                    "dns_ptr": []
+                },
+                "floating_ips": []
+            },
+            # Add other required fields with mock values
+            "server_type": {
+                "id": 1,
+                "name": "cx11",
+                "description": "CX11",
+                "cores": 1,
+                "memory": 2.0,
+                "disk": 20,
+                "prices": []
+            },
+            "datacenter": {
+                "id": 1,
+                "name": "nbg1-dc3",
+                "description": "Nuremberg 1 DC 3",
+                "location": {
                     "id": 1,
-                    "name": "nbg1-dc3",
-                    "description": "Nuremberg 1 DC 3",
-                    "location": {
-                        "id": 1,
-                        "name": "nbg1",
-                        "description": "Nuremberg DC Park 1",
-                        "country": "DE",
-                        "city": "Nuremberg",
-                        "latitude": 49.452102,
-                        "longitude": 11.076665
-                    }
-                },
-                "image": {
-                    "id": 1,
-                    "type": "system",
-                    "status": "available",
-                    "name": "ubuntu-20.04",
-                    "description": "Ubuntu 20.04 LTS",
-                    "image_size": 2.3,
-                    "disk_size": 10,
-                    "created": "2020-05-01T12:00:00+00:00",
-                    "created_from": None,
-                    "bound_to": None,
-                    "os_flavor": "ubuntu",
-                    "os_version": "20.04",
-                    "rapid_deploy": False
-                },
-                "iso": None,
-                "rescue_enabled": False,
-                "locked": False,
+                    "name": "nbg1",
+                    "description": "Nuremberg DC Park 1",
+                    "country": "DE",
+                    "city": "Nuremberg",
+                    "latitude": 49.452102,
+                    "longitude": 11.076665
+                }
+            },
+            "image": {
+                "id": 1,
+                "type": "system",
+                "status": "available",
+                "name": "ubuntu-20.04",
+                "description": "Ubuntu 20.04 LTS",
+                "image_size": 2.3,
+                "disk_size": 10,
                 "created": "2020-05-01T12:00:00+00:00",
-                "included_traffic": 2199023255552,
-                "outgoing_traffic": 123456,
-                "ingoing_traffic": 123456,
-                "backup_window": "22-02",
-                "protection": {
-                    "delete": False,
-                    "rebuild": False
-                },
-                "labels": labels,
-                "volumes": [],
-                "load_balancers": [],
-                "primary_disk_size": 20,
-                "placement_group": None
-            }
-            servers.append(server)
+                "created_from": None,
+                "bound_to": None,
+                "os_flavor": "ubuntu",
+                "os_version": "20.04",
+                "rapid_deploy": False
+            },
+            "iso": None,
+            "rescue_enabled": False,
+            "locked": False,
+            "created": "2020-05-01T12:00:00+00:00",
+            "included_traffic": 2199023255552,
+            "outgoing_traffic": 123456,
+            "ingoing_traffic": 123456,
+            "backup_window": "22-02",
+            "protection": {
+                "delete": False,
+                "rebuild": False
+            },
+            "labels": labels,
+            "volumes": [],
+            "load_balancers": [],
+            "primary_disk_size": 20,
+            "placement_group": None
+        }
+        servers.append(server)
 
     return servers
 
@@ -213,6 +212,28 @@ async def get_servers(label_selector: str = Query(None)):
     }
 
     return response
+
+@app.get('/v1/servers/{server_id}')
+async def get_server(server_id: int | str):
+    servers = get_mock_servers()
+    for server in servers:
+        if str(server['id']) == str(server_id) or server['name'].startswith(str(server_id)):
+            return { "server": server }
+    raise HTTPException(status_code=404, detail="Server not found")
+
+class ServerUpdate(BaseModel):
+    labels: Dict[str, str]
+
+@app.put('/v1/servers/{server_id}')
+async def update_server(server_id: int | str, update: ServerUpdate):
+    servers = get_mock_servers()
+    for server in servers:
+        if str(server['id']) == str(server_id) or server['name'].startswith(str(server_id)):
+            container = client.containers.get(server['name'])
+            label_store[container.id] = update.labels
+            server['labels'] = update.labels
+            return { "server": server }
+    raise HTTPException(status_code=404, detail="Server not found")
 
 if __name__ == '__main__':
     uvicorn.run(app, host=["::", "0.0.0.0"], port=5000, timeout_keep_alive=10)
