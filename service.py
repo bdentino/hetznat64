@@ -105,43 +105,45 @@ class Hetznat64Service:
       ipv6 = f"{network[0].exploded[:-9]}{(server_id >> 16) & 0xFFFF:04x}:{server_id & 0xFFFF:04x}"
       peer_ip = IPv6Interface(ipv6)
 
-      has_peer = any(peer_ip in p.allowed_ips for p in config.peers.values())
-      if not has_peer:
-        endpoint_host = IPv6Interface(server.public_net.ipv6.ip).ip
-        # Services on hetzner servers with a ::/64 address will actually be listening on ::1
-        if endpoint_host.exploded.endswith(":0000"):
-            endpoint_host = IPv6Interface(endpoint_host.exploded[:-2] + "1").ip
-        print(f"Server {server.id} with IP {endpoint_host} is waiting for handshake (peer ip: {peer_ip})")
-        try:
-            response = requests.post(
-                f"https://[{endpoint_host}]:5001/handshake",
-                json={
-                    'control_ip': str(self.__config.wireguard.ip),
-                    'control_port': self.__config.wireguard.port,
-                    'public_key': str(self.__config.wireguard.key.public_key()),
-                    'agent_ip': str(peer_ip),
-                },
-                timeout=10,
-                cert=(self.__config.cert_file, self.__config.key_file),
-                verify=self.__config.ca_file,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                public_key = data['public_key']
-                endpoint_port = data['port']
-            else:
-                print(f"Handshake failed with status {response.status_code}")
-                continue
-        except Exception as e:
-            print(f"Failed to connect to agent: {e}")
-            continue
-        config.add_peer(WireguardPeer(
-          public_key=public_key,
-          endpoint_host=endpoint_host,
-          endpoint_port=endpoint_port,
-          persistent_keepalive=25,
-          allowed_ips=[ipv6],
-        ));
+      peer_key = next((p for p in config.peers.keys() if peer_ip in config.peers[p].allowed_ips), None)
+      if peer_key:
+        config.del_peer(peer_key)
+
+      endpoint_host = IPv6Interface(server.public_net.ipv6.ip).ip
+      # Services on hetzner servers with a ::/64 address will actually be listening on ::1
+      if endpoint_host.exploded.endswith(":0000"):
+          endpoint_host = IPv6Interface(endpoint_host.exploded[:-2] + "1").ip
+      print(f"Server {server.id} with IP {endpoint_host} is waiting for handshake (peer ip: {peer_ip})")
+      try:
+          response = requests.post(
+              f"https://[{endpoint_host}]:5001/handshake",
+              json={
+                  'control_ip': str(self.__config.wireguard.ip),
+                  'control_port': self.__config.wireguard.port,
+                  'public_key': str(self.__config.wireguard.key.public_key()),
+                  'agent_ip': str(peer_ip),
+              },
+              timeout=10,
+              cert=(self.__config.cert_file, self.__config.key_file),
+              verify=self.__config.ca_file,
+          )
+          if response.status_code == 200:
+              data = response.json()
+              public_key = data['public_key']
+              endpoint_port = data['port']
+          else:
+              print(f"Handshake failed with status {response.status_code}")
+              continue
+      except Exception as e:
+          print(f"Failed to connect to agent: {e}")
+          continue
+      config.add_peer(WireguardPeer(
+        public_key=public_key,
+        endpoint_host=endpoint_host,
+        endpoint_port=endpoint_port,
+        persistent_keepalive=25,
+        allowed_ips=[ipv6],
+      ));
 
     if oldconfig != config.to_wgconfig(wgquick_format=True):
       print(config.to_wgconfig(wgquick_format=True))
