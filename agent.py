@@ -38,7 +38,6 @@ class Hetznat64Agent:
         self.__config = config
         self.__wg_key = None
         self.__server_id = None
-        self.__control_ip = None
         self.__client = hcloud.Client(token=self.__config.api_key, api_endpoint=self.__config.api_endpoint)
         self.__app = FastAPI()
         self.__setup_routes()
@@ -88,8 +87,6 @@ class Hetznat64Agent:
 
         if not self.__wg_key:
             self.__wg_key = WireguardKey.generate()
-
-        self.__control_ip = ip_interface(control_ip).ip
 
         # Extract prefix from control_ip and apply to agent_ip
         control_prefix = str(ip_interface(control_ip).network)
