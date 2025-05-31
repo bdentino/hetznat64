@@ -2,14 +2,14 @@ import os
 import ssl
 import socket
 import subprocess
+import threading
 import time
 from ipaddress import ip_interface, IPv6Interface
 from dataclasses import dataclass
 
 import hcloud
-import requests
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from wireguard_tools import WireguardConfig, WireguardDevice, WireguardKey, WireguardPeer
 
 @dataclass(kw_only=True)
@@ -32,33 +32,74 @@ class Hetznat64AgentConfig:
     api_endpoint: str = "https://api.hetzner.cloud/v1"
     discovery_label_prefix: str = "hetznat64"
 
-
 class Hetznat64Agent:
     def __init__(self, config: Hetznat64AgentConfig):
+        self.__lock = threading.Lock()
+        self.__state_label = f'{config.discovery_label_prefix}.status'
+        self.__state = 'initializing'
+        self.__control_ip = None
         self.__config = config
         self.__wg_key = None
-        self.__server_id = None
         self.__client = hcloud.Client(token=self.__config.api_key, api_endpoint=self.__config.api_endpoint)
         self.__app = FastAPI()
         self.__setup_routes()
 
-    def add_labels(self, labels: dict):
-        if not self.__server_id:
-            try:
-                response = requests.get('http://169.254.169.254/hetzner/v1/metadata/instance-id', timeout=2)
-                self.__server_id = response.text
-            except Exception:
-                # If hetzner metadata server is not available,
-                # assume we're running in dev environment
-                self.__server_id = os.environ.get('HOSTNAME', None)
+    def __get_state(self):
+        with self.__lock:
+            return self.__state
 
-        server = self.__client.servers.get_by_id(self.__server_id)
+    def __set_state(self, value):
+        with self.__lock:
+            self.__state = value
+            self.add_labels({ self.__state_label: value })
+
+    def __get_control_ip(self):
+        with self.__lock:
+            return self.__control_ip
+
+    def __set_control_ip(self, value):
+        with self.__lock:
+            self.__control_ip = value
+
+    def __check_connection(self):
+        while True:
+            control_ip = self.__get_control_ip()
+            state = self.__get_state()
+            if control_ip and state != 'connected':
+                ping_ip = str(IPv6Interface(control_ip).ip)
+                try:
+                    ping_result = subprocess.run(
+                        ["ping6", "-c", "1", "-W", "2", ping_ip],
+                        capture_output=True
+                    )
+                    if ping_result.returncode == 0:
+                        print(f"Ping to {ping_ip} succeeded")
+                        self.__set_state('connected')
+                    else:
+                        print(f"Ping to {ping_ip} failed")
+                except Exception as e:
+                    print(f"Ping process failed for {ping_ip}: {e}")
+            elif not control_ip and state != 'waiting':
+                self.__set_state('waiting')
+            time.sleep(1)
+
+    def add_labels(self, labels: dict):
+        server_id = os.environ.get('HOSTNAME', None)
+        try:
+            if os.path.exists("/var/lib/cloud/data/instance-id"):
+                with open("/var/lib/cloud/data/instance-id", "r") as f:
+                    server_id = f.read().strip()
+        except Exception:
+            pass
+
+        server = self.__client.servers.get_by_id(server_id)
         existing_labels = server.labels or {}
         existing_labels.update(labels)
         server.update(labels=existing_labels)
 
     def start(self):
-        self.add_labels({ f'{self.__config.discovery_label_prefix}.status': 'waiting' })
+        self.__set_control_ip(None)
+        threading.Thread(target=self.__check_connection, daemon=True).start()
         uvicorn.run(self.__app, host='::', port=self.__config.rest_port,
                     ssl_certfile=self.__config.cert_file,
                     ssl_keyfile=self.__config.key_file,
@@ -75,6 +116,8 @@ class Hetznat64Agent:
         return {"status": "ok"}
 
     async def __health(self):
+        if self.__get_state() != 'connected':
+            raise HTTPException(status_code=500, detail="Not connected to control server")
         return {"status": "ok"}
 
     async def __handshake(self, request: Request):
@@ -85,6 +128,7 @@ class Hetznat64Agent:
         public_key = data.get('public_key')
         preshared_key = data.get('preshared_key', None)
 
+        self.__control_ip = control_ip
         if not self.__wg_key:
             self.__wg_key = WireguardKey.generate()
 
@@ -120,11 +164,6 @@ class Hetznat64Agent:
 
         print(config.to_wgconfig(wgquick_format=True))
         WireguardDevice.get(self.__config.wg_interface).set_config(config)
-
-        # TODO: this label shouldn't be updated until connection is confirmed
-        self.add_labels({
-            f'{self.__config.discovery_label_prefix}.status': 'connected'
-        })
 
         response = {
             'public_key': str(self.__wg_key.public_key()),

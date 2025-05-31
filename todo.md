@@ -2,6 +2,10 @@ Testing:
 
 - Test simple server & agent connectivity on pi & hetzner (might need to investigate persistent keepalive for wireguard) [DONE]
 
+- generate valid cert on agent startup (ip san) [DONE]
+- generate valid cert on server startup (dns san) [DONE]
+- agent validate server certificate with just ca [DONE]
+
 Nat64:
 
 - Setup cloudflare dns64 [DONE]
@@ -40,23 +44,27 @@ Nat64:
 
 Reliability:
 
-- Handle scale in, scale out, restart of agents
-- Handle restart of server [DONE]
-- Handle change of server ip address
+- Handle scale in, scale out, restart of agents [DONE]
 - Healthchecks based on connectivity [DONE]
+- Handle restart of server
+- Handle change of server ip address
 - Tests
+- Performance monitoring
 
 Improvements:
 
 - Investigate panic with altuntun, see if we can switch back and check if performance is better
 - Move wg setup from entrypoint to a separate script and replace individual sudoers commands [DONE]
-- Support for kernelspace wireguard [DONE]
+- Support for kernelspace wireguard
 - Preshared key support
 - Key rotation
-- HTTPS trusted CA & client cert validation for agent/server communication
+- Status page
+- HTTPS trusted CA & client cert validation for agent/server communication [DONE]
+- Try with jool for nat64 (better performance)
+- Try deployment with rootless docker
 
 Deployment:
 
-- Setup dns64 on hetzner hosts via terraform
-- Figure out how to get all containers on host to use nat64 agent for 6to4 traffic
-- Add agent to cloud-init userdata in hetzner terraform
+- Setup dns64 on hetzner hosts via terraform [DONE]
+- Figure out how to get all containers on host to use nat64 agent for 6to4 traffic [DONE]
+- Add agent to cloud-init userdata in hetzner terraform [DONE]
