@@ -137,15 +137,13 @@ class Hetznat64Agent:
         agent_ip_addr = ip_interface(agent_ip).ip
         new_agent_ip = f"{agent_ip_addr}/{control_prefix.split('/')[-1]}"
 
-        # Update IP using sudo script
-        subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(new_agent_ip))], check=True)
-
         # Check and update Wireguard configuration
         config = WireguardConfig(
             addresses=[IPv6Interface(agent_ip)],
             private_key=self.__wg_key,
             listen_port=self.__config.wg_port,
         )
+
         # Resolve the control server hostname to get its IPv6 address
         try:
             addrinfo = socket.getaddrinfo(self.__config.control_server_hostname, None, socket.AF_INET6)
@@ -162,8 +160,12 @@ class Hetznat64Agent:
             allowed_ips=[control_ip, IPv6Interface("64:ff9b::/96")],
         ))
 
-        print(config.to_wgconfig(wgquick_format=True))
-        WireguardDevice.get(self.__config.wg_interface).set_config(config)
+        current_config = WireguardDevice.get(self.__config.wg_interface).get_config().to_wgconfig(wgquick_format=True)
+        if current_config != config.to_wgconfig(wgquick_format=True):
+            print(f"Updating Wireguard configuration")
+            # Update IP using sudo script
+            subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(new_agent_ip))], check=True)
+            WireguardDevice.get(self.__config.wg_interface).set_config(config)
 
         response = {
             'public_key': str(self.__wg_key.public_key()),
