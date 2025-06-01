@@ -49,9 +49,11 @@ class Hetznat64Agent:
             return self.__state
 
     def __set_state(self, value):
-            print(f"Updating state from {self.__state} to {value}")
-            self.__state = value
-            self.add_labels({ self.__state_label: value })
+        with self.__lock:
+            if self.__state != value:
+                print(f"Updating state from {self.__state} to {value}")
+                self.__state = value
+                self.add_labels({ self.__state_label: value })
 
     def __get_control_ip(self):
         with self.__lock:
@@ -62,21 +64,25 @@ class Hetznat64Agent:
             self.__control_ip = value
 
     def __check_connection(self):
+        recheck = 0
         while True:
+            recheck += 1
             control_ip = self.__get_control_ip()
             state = self.__get_state()
-            if control_ip and state != 'connected':
+            if control_ip and (state != 'connected' or recheck >= 20):
                 ping_ip = str(IPv6Interface(control_ip).ip)
                 try:
                     ping_result = subprocess.run(
                         ["ping6", "-c", "1", "-W", "2", ping_ip],
                         capture_output=True
                     )
+                    recheck = 0
                     if ping_result.returncode == 0:
                         print(f"Ping to {ping_ip} succeeded")
                         self.__set_state('connected')
                     else:
                         print(f"Ping to {ping_ip} failed")
+                        self.__set_state('waiting')
                 except Exception as e:
                     print(f"Ping process failed for {ping_ip}: {e}")
             elif not control_ip and state != 'waiting':
