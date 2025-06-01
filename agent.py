@@ -160,10 +160,13 @@ class Hetznat64Agent:
             allowed_ips=[control_ip, IPv6Interface("64:ff9b::/96")],
         ))
 
-        current_config = WireguardDevice.get(self.__config.wg_interface).get_config().to_wgconfig(wgquick_format=True)
-        if current_config != config.to_wgconfig(wgquick_format=True):
+        current_config = WireguardDevice.get(self.__config.wg_interface).get_config()
+        current_peer = current_config.peers.keys()[0]
+        new_peer = config.peers.keys()[0]
+        if current_peer.public_key() != new_peer.public_key():
             print(f"Updating Wireguard configuration")
-            # Update IP using sudo script
+            print('current_peer', current_peer)
+            print('new_peer', new_peer)
             subprocess.run(["/usr/bin/sudo", "/update-ip.sh", str(ip_interface(new_agent_ip))], check=True)
             WireguardDevice.get(self.__config.wg_interface).set_config(config)
 
