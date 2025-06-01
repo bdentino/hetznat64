@@ -155,20 +155,21 @@ class Hetznat64Service:
     if oldconfig != config.to_wgconfig(wgquick_format=True):
       print(config.to_wgconfig(wgquick_format=True))
       WireguardDevice.get(self.__config.wireguard.name).set_config(config)
-      updated = WireguardDevice.get(self.__config.wireguard.name).get_config()
-      for peer in updated.peers.values():
-        if not peer.last_handshake:
-          try:
-            ping_result = subprocess.run(
-              ["ping6", "-c", "1", "-W", "5", str(peer.allowed_ips[0].ip)],
-              capture_output=True
-            )
-            if ping_result.returncode == 0:
-              print(f"Ping to {peer.allowed_ips[0].ip} succeeded")
-            else:
-              print(f"Ping to {peer.allowed_ips[0].ip} failed")
-          except Exception as e:
-            print(f"Ping process failed for {peer.allowed_ips[0].ip}: {e}")
+
+    updated = WireguardDevice.get(self.__config.wireguard.name).get_config()
+    for peer in updated.peers.values():
+      if not peer.last_handshake:
+        try:
+          ping_result = subprocess.run(
+            ["ping6", "-c", "1", "-W", "5", str(peer.allowed_ips[0].ip)],
+            capture_output=True
+          )
+          if ping_result.returncode == 0:
+            print(f"Ping to {peer.allowed_ips[0].ip} succeeded")
+          else:
+            print(f"Ping to {peer.allowed_ips[0].ip} failed")
+        except Exception as e:
+          print(f"Ping process failed for {peer.allowed_ips[0].ip}: {e}")
     else:
       print("No changes to the config")
 
