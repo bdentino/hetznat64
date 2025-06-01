@@ -111,8 +111,8 @@ class Hetznat64Service:
         config.del_peer(peer_key)
 
       # Delete any peers with the same endpoint ip
-      endpoint_host = str(IPv6Interface(server.public_net.ipv6.ip).ip)
-      endpoint_peers = [p for p in config.peers.keys() if str(config.peers[p].endpoint_host) == endpoint_host]
+      endpoint_host = IPv6Interface(server.public_net.ipv6.ip).ip
+      endpoint_peers = [p for p in config.peers.keys() if str(config.peers[p].endpoint_host) == str(endpoint_host)]
       for peer_key in endpoint_peers:
         config.del_peer(peer_key)
 
