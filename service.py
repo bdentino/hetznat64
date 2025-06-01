@@ -105,18 +105,17 @@ class Hetznat64Service:
       ipv6 = f"{network[0].exploded[:-9]}{(server_id >> 16) & 0xFFFF:04x}:{server_id & 0xFFFF:04x}"
       peer_ip = IPv6Interface(ipv6)
 
+      # Delete any peers with the same wireguard ip
       peer_key = next((p for p in config.peers.keys() if peer_ip in config.peers[p].allowed_ips), None)
       if peer_key:
-        # Delete any peers with the same endpoint or wireguard ip
-        peer_endpoint = config.peers[peer_key].endpoint_host
-        peer_port = config.peers[peer_key].endpoint_port
         config.del_peer(peer_key)
-        for peer in config.peers:
-          if peer.endpoint_host == peer_endpoint and peer.endpoint_port == peer_port:
-            config.del_peer(peer)
-            break
 
+      # Delete any peers with the same endpoint ip
       endpoint_host = IPv6Interface(server.public_net.ipv6.ip).ip
+      endpoint_peers = [p for p in config.peers.keys() if config.peers[p].endpoint_host == endpoint_host]
+      for peer_key in endpoint_peers:
+        config.del_peer(peer_key)
+
       # Services on hetzner servers with a ::/64 address will actually be listening on ::1
       if endpoint_host.exploded.endswith(":0000"):
           endpoint_host = IPv6Interface(endpoint_host.exploded[:-2] + "1").ip
