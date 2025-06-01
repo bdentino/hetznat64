@@ -161,8 +161,8 @@ class Hetznat64Agent:
         ))
 
         current_config = WireguardDevice.get(self.__config.wg_interface).get_config()
-        current_peer = current_config.peers.keys()[0]
-        new_peer = config.peers.keys()[0]
+        current_peer = next(current_config.peers.keys(), None)
+        new_peer = next(config.peers.keys(), None)
         if current_peer.public_key() != new_peer.public_key():
             print(f"Updating Wireguard configuration")
             print('current_peer', current_peer)
