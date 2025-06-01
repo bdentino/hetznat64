@@ -49,7 +49,7 @@ class Hetznat64Agent:
             return self.__state
 
     def __set_state(self, value):
-        with self.__lock:
+            print(f"Updating state from {self.__state} to {value}")
             self.__state = value
             self.add_labels({ self.__state_label: value })
 
